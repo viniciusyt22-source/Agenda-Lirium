@@ -184,6 +184,9 @@ async function carregarPainel(){
  el("listaPainel").innerHTML=(data||[]).map(a=>`
  <div class="item">
  <strong>${mostrarData(a.inicio)} – ${hora(a.fim)}</strong>
+ <br>
+ <strong>Cliente: ${a.nome_cliente||"Não informado"}</strong>
+ <br>
  ${a.profissional} · ${a.modalidade}<br>
  Origem: ${a.origem}
  </div>`).join("")||"<p>Nenhum horário registrado.</p>";
