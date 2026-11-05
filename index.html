@@ -217,18 +217,25 @@ el("salvar").onclick=async()=>{
   const d=el("data").value;
   const ini=new Date(d+"T"+el("inicio").value+":00");
   const fim=new Date(d+"T"+el("fim").value+":00");
+  const nome=el("nome_cliente").value.trim();
+
+  if(!nome)throw Error("Informe o nome do cliente.");
   if(fim<=ini)throw Error("O horário final precisa ser posterior ao inicial.");
 
   const {error}=await db.rpc("criar_agendamento",{
    p_pin:pin,
+   p_nome_cliente:nome,
    p_profissional:profissional,
    p_modalidade:el("modalidade").value,
    p_origem:el("origem").value,
    p_inicio:ini.toISOString(),
    p_fim:fim.toISOString()
   });
+
   if(error)throw error;
+
   mensagem("mensagem","Agendamento adicionado com sucesso!");
+  el("nome_cliente").value="";
   await carregarAgenda();
  }catch(e){mensagem("mensagem",e.message);}
 };
