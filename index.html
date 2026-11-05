@@ -170,13 +170,13 @@ async function carregarAgenda(){
 
  el("lista").innerHTML=itens.map(a=>`
  <div class="item">
- <strong>${mostrarData(a.inicio)} – ${hora(a.fim)}</strong>
+ <strong>${mostrarData(a.inicio)} – ${hora(a.fim)}</strong><br>
+ <strong>Cliente: ${a.nome_cliente||"Não informado"}</strong><br>
  ${a.profissional} · ${a.modalidade}<br>
  Origem: ${a.origem}
  ${a.profissional===profissional?`<button data-excluir="${a.id}" style="margin-top:8px;background:#b91c1c">Excluir meu horário</button>`:""}
  </div>`).join("")||"<p>Nenhum agendamento nesse período.</p>";
 }
-
 async function carregarPainel(){
  const {data,error}=await db.rpc("listar_painel");
  if(error)throw error;
