@@ -1,0 +1,255 @@
+
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Agenda Studio</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#f1f5f9;color:#172033;font-family:Arial,sans-serif}
+main{max-width:850px;margin:auto;padding:16px}
+header{background:#172554;color:white;padding:22px;border-radius:15px;margin-bottom:16px}
+section{background:white;padding:18px;border-radius:14px;margin:14px 0}
+h1,h2{margin-top:0}
+label{display:block;margin:12px 0;font-weight:bold}
+input,select,button{width:100%;padding:13px;border:1px solid #cbd5e1;border-radius:9px;font-size:16px;margin-top:6px}
+button{background:#1d4ed8;color:white;border:0;font-weight:bold;cursor:pointer}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px}
+.item{padding:13px;border:1px solid #dbe3ee;border-radius:10px;margin:10px 0}
+.item strong{display:block;margin-bottom:5px}
+.barra{display:flex;gap:8px;align-items:center}
+.barra button{width:auto;flex:1}
+.mensagem{font-weight:bold;margin-top:12px}
+footer{text-align:center;color:#64748b;padding:20px}
+</style>
+</head>
+<body>
+<main>
+<header>
+<h1>Agenda Studio</h1>
+<p>Agenda compartilhada de atendimentos</p>
+</header>
+
+<section id="login">
+<h2>Acesso profissional</h2>
+<label>Selecione seu perfil
+<select id="profissional">
+<option>Marcos</option>
+<option>Vinícius</option>
+<option>Ana Márcia</option>
+</select>
+</label>
+<label>PIN de acesso
+<input id="pin" type="password" inputmode="numeric" placeholder="Digite o PIN">
+</label>
+<button id="entrar">Entrar na agenda</button>
+<p id="erro" class="mensagem"></p>
+</section>
+
+<section id="agenda" hidden>
+<div class="barra">
+<h2>Agendamentos</h2>
+<button id="sair">Sair</button>
+</div>
+
+<label>Data
+<input id="data" type="date">
+</label>
+
+<div class="grid">
+<label>Modalidade
+<select id="modalidade">
+<option>Pilates</option>
+<option>Massoterapia</option>
+<option>Outro</option>
+</select>
+</label>
+
+<label>Origem
+<select id="origem">
+<option>Wellhub</option>
+<option>TotalPass</option>
+<option>Gurupass</option>
+<option>Particular</option>
+</select>
+</label>
+
+<label>Horário inicial
+<select id="inicio"></select>
+</label>
+
+<label>Horário final
+<select id="fim"></select>
+</label>
+</div>
+
+<button id="salvar">Adicionar agendamento</button>
+<p id="mensagem" class="mensagem"></p>
+
+<div class="barra">
+<button id="dia">Visualização diária</button>
+<button id="semana">Visualização semanal</button>
+</div>
+<button id="atualizar" style="margin-top:10px">Atualizar agenda</button>
+<div id="lista"></div>
+</section>
+
+<section id="painel" hidden>
+<h2>Painel geral do Studio</h2>
+<p>Visualização dos horários de todos os profissionais.</p>
+<div id="listaPainel"></div>
+</section>
+<footer>Agenda Studio</footer>
+</main>
+
+<script>
+const SUPABASE_URL = "https://iygzzwcfpeympbqujrsz.supabase.co/rest/v1/";
+const SUPABASE_KEY = "sb_publishable_dqDhHDfiqZnCI9MQzVZyxQ_Yn4XAskZ";
+
+const db = supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+
+let profissional = "";
+let pin = "";
+let modo = "dia";
+
+const el = id => document.getElementById(id);
+const painel = new URLSearchParams(location.search).get("painel")==="1";
+
+function mensagem(id,texto){el(id).textContent=texto;}
+
+function dataLocal(d){
+ return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10);
+}
+
+function montarHorarios(){
+ for(let m=420;m<=1170;m+=30){
+  let h=String(Math.floor(m/60)).padStart(2,"0")+":"+String(m%60).padStart(2,"0");
+  el("inicio").add(new Option(h,h));
+  el("fim").add(new Option(h,h));
+ }
+ el("fim").value="07:30";
+}
+
+function mostrarData(d){
+ return new Date(d).toLocaleString("pt-BR",{dateStyle:"short",timeStyle:"short"});
+}
+
+function hora(d){
+ return new Date(d).toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"});
+}
+
+async function carregarAgenda(){
+ const {data,error}=await db.rpc("listar_agenda",{p_pin:pin});
+ if(error) throw error;
+
+ const base=new Date(el("data").value+"T12:00:00");
+ let inicio=new Date(base),fim=new Date(base);
+
+ if(modo==="semana"){
+  inicio.setDate(base.getDate()-((base.getDay()+6)%7));
+  inicio.setHours(0,0,0,0);
+  fim=new Date(inicio);
+  fim.setDate(fim.getDate()+7);
+ }else{
+  inicio.setHours(0,0,0,0);
+  fim.setDate(fim.getDate()+1);
+  fim.setHours(0,0,0,0);
+ }
+
+ const itens=(data||[]).filter(a=>{
+  const d=new Date(a.inicio);
+  return d>=inicio&&d<fim;
+ });
+
+ el("lista").innerHTML=itens.map(a=>`
+ <div class="item">
+ <strong>${mostrarData(a.inicio)} – ${hora(a.fim)}</strong>
+ ${a.profissional} · ${a.modalidade}<br>
+ Origem: ${a.origem}
+ ${a.profissional===profissional?`<button data-excluir="${a.id}" style="margin-top:8px;background:#b91c1c">Excluir meu horário</button>`:""}
+ </div>`).join("")||"<p>Nenhum agendamento nesse período.</p>";
+}
+
+async function carregarPainel(){
+ const {data,error}=await db.rpc("listar_painel");
+ if(error)throw error;
+
+ el("listaPainel").innerHTML=(data||[]).map(a=>`
+ <div class="item">
+ <strong>${mostrarData(a.inicio)} – ${hora(a.fim)}</strong>
+ ${a.profissional} · ${a.modalidade}<br>
+ Origem: ${a.origem}
+ </div>`).join("")||"<p>Nenhum horário registrado.</p>";
+}
+
+montarHorarios();
+el("data").value=dataLocal(new Date());
+
+if(painel){
+ el("login").hidden=true;
+ el("painel").hidden=false;
+ carregarPainel().catch(e=>mensagem("listaPainel",e.message));
+ setInterval(()=>carregarPainel().catch(()=>{}),15000);
+}
+
+el("entrar").onclick=async()=>{
+ try{
+  profissional=el("profissional").value;
+  pin=el("pin").value;
+  const {error}=await db.rpc("listar_agenda",{p_pin:pin});
+  if(error)throw error;
+  el("login").hidden=true;
+  el("agenda").hidden=false;
+  await carregarAgenda();
+ }catch(e){mensagem("erro",e.message);}
+};
+
+el("sair").onclick=()=>{
+ pin="";
+ el("agenda").hidden=true;
+ el("login").hidden=false;
+};
+
+el("salvar").onclick=async()=>{
+ try{
+  const d=el("data").value;
+  const ini=new Date(d+"T"+el("inicio").value+":00");
+  const fim=new Date(d+"T"+el("fim").value+":00");
+  if(fim<=ini)throw Error("O horário final precisa ser posterior ao inicial.");
+
+  const {error}=await db.rpc("criar_agendamento",{
+   p_pin:pin,
+   p_profissional:profissional,
+   p_modalidade:el("modalidade").value,
+   p_origem:el("origem").value,
+   p_inicio:ini.toISOString(),
+   p_fim:fim.toISOString()
+  });
+  if(error)throw error;
+  mensagem("mensagem","Agendamento adicionado com sucesso!");
+  await carregarAgenda();
+ }catch(e){mensagem("mensagem",e.message);}
+};
+
+el("atualizar").onclick=()=>carregarAgenda().catch(e=>mensagem("mensagem",e.message));
+el("dia").onclick=()=>{modo="dia";carregarAgenda().catch(e=>mensagem("mensagem",e.message));};
+el("semana").onclick=()=>{modo="semana";carregarAgenda().catch(e=>mensagem("mensagem",e.message));};
+el("data").onchange=()=>carregarAgenda().catch(e=>mensagem("mensagem",e.message));
+
+el("lista").onclick=async e=>{
+ const b=e.target.closest("[data-excluir]");
+ if(!b)return;
+ if(!confirm("Deseja excluir este agendamento?"))return;
+ try{
+  const {error}=await db.rpc("excluir_agendamento",{
+   p_pin:pin,p_profissional:profissional,p_id:b.dataset.excluir
+  });
+  if(error)throw error;
+  await carregarAgenda();
+ }catch(err){mensagem("mensagem",err.message);}
+};
+</script>
+</body>
+</html>
